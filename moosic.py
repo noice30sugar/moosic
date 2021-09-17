@@ -4,13 +4,8 @@ from discord.ext import commands
 import nest_asyncio 
 import youtube_dl as ydl
 import asyncio
-from dotenv import load_dotenv
 
 token = os.environ["token"]
-    
-
-nest_asyncio.apply()
- 
 intents = discord.Intents().all()
 client = discord.Client(intents=intents)
 
