@@ -6,9 +6,7 @@ import youtube_dl as ydl
 import asyncio
 from dotenv import load_dotenv
 
-with ('token.txt', 'r') as f:
-    token = f.readlines()
-    token = token[0].strip()
+token = os.environ["token"]
     
 
 nest_asyncio.apply()
