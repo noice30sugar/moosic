@@ -1,7 +1,6 @@
 import discord
 import os
 from discord.ext import commands
-import nest_asyncio 
 import youtube_dl as ydl
 import asyncio
 
