@@ -4,13 +4,15 @@ from discord.ext import commands
 import nest_asyncio 
 import youtube_dl as ydl
 import asyncio
+from dotenv import load_dotenv
 
-app_id = '887221492461502514'
-public_key = '870a560717ac8d43849050a0ee5633e329e872225b49ff78768ba10028a33413'
-token = 'ODg3MjIxNDkyNDYxNTAyNTE0.YUA_Zw.04aJ08obDGz-i2b2db6YiVIqQF0'
+with ('token.txt', 'r') as f:
+    token = f.readlines()
+    token = token[0].strip()
+    
 
 nest_asyncio.apply()
-
+ 
 intents = discord.Intents().all()
 client = discord.Client(intents=intents)
 
