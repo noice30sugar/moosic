@@ -1,5 +1,5 @@
 ## Moosic, the Discord Music Bot
-![Maui](C:\Users\zyxan\Desktop\PICS)
+![Maui](https://static.wikia.nocookie.net/disney/images/6/6f/Profile_-_Maui.jpeg/revision/latest/scale-to-width-down/1000?cb=20190628013307)
 
 This bot responds to user commands in a Discord text channel, joining the user's voice channel and playing songs. 
 The bot uses youtube-dl to search songs from YouTube, streaming the audio into the user's voice channel.
