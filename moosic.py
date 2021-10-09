@@ -36,6 +36,8 @@ class Song(discord.PCMVolumeTransformer):
         self.title = data.get('title')
         self.url = data.get('webpage_url')
         self.duration = data.get('duration')
+        self.thumbnail = data.get('thumbnail')
+        self.uploader = data.get('uploader')
 
     @classmethod
     async def search(cls, search, *, loop=None):
@@ -52,6 +54,7 @@ class Queue:
         self.guild = ctx.guild
         self.queue = asyncio.Queue()
         self.play_next = asyncio.Event()
+        self.looping = False
         
         ctx.bot.loop.create_task(self.queue_loop())
         
@@ -62,14 +65,22 @@ class Queue:
             self.play_next.clear()
             song_obj = await self.queue.get()
             song_obj = await Song.search(song_obj.title)
-            self.guild.voice_client.play(song_obj, after=lambda _: self.bot.loop.call_soon_threadsafe(self.play_next  .set))
-            await self.queue.put(song_obj)
+            self.guild.voice_client.play(song_obj, after=lambda _: self.bot.loop.call_soon_threadsafe(self.play_next.set))
+            if self.looping:
+                await self.queue.put(song_obj) 
             await self.ctx.send('Playing '+ song_obj.title)
             #await ctx.send(song_obj.url)
             await self.play_next.wait()
             
             # Make sure the FFmpeg process is cleaned up.
             song_obj.cleanup()
+            
+def format_for_queue_embed(song, author, index=0):
+    if not(index):
+        return '[%s](%s) | `%d:%d Requested By: %s`\n' %(song.title, song.url, song.duration//60, song.duration%60, author)
+    else:
+        return '`%d.` [%s](%s) | `%d:%d Requested By: %s`\n\n' %(index, song.title, song.url, song.duration//60, song.duration%60, author)
+        
             
 class MusicBot(commands.Cog):
     def __init__(self, bot):
@@ -91,7 +102,7 @@ class MusicBot(commands.Cog):
     async def leave(self, ctx):
         vc = ctx.message.guild.voice_client
         if not vc:
-            await ctx.send("im already dead")
+            await ctx.send("**im already dead**")
         elif vc.is_connected():
             await vc.disconnect()
             self.player = None
@@ -110,7 +121,7 @@ class MusicBot(commands.Cog):
             await self.player.queue.put(song_obj)
             await ctx.send('Queued '+ song_obj.title)
         except:
-            await ctx.send('Unable to load from youtube')
+            await ctx.send(':x: **Unable to load from Youtube** :x:')
 
     
     @commands.command(name='yw', help='youre welcome')
@@ -128,48 +139,74 @@ class MusicBot(commands.Cog):
         vc = ctx.message.guild.voice_client
         if vc.is_playing():
             vc.pause()
-            await ctx.send('Pausing...')
+            await ctx.send(':pause_button: **Pausing...** :pause_button:')
 
     @commands.command(name='resume', help='resumes')
     async def resume(self, ctx):
         vc = ctx.message.guild.voice_client
         if vc.is_paused():
             vc.resume()
-            await ctx.send('Resuming...')
+            await ctx.send(':arrow_forward: **Resuming...** :arrow_forward: ')
             
     @commands.command(name='np', help='now playing')
     async def np(self, ctx):
         vc = ctx.voice_client
-        await ctx.send("Currently playing " + vc.source.title)
-        #await ctx.send(vc.source.url)
+        try:
+            line = "**-------------------------------**"
+            embed = discord.Embed(title="♪ Now Playing ♪", description=f"[{vc.source.title}]({vc.source.url})\n{line}\n", color=0x00ff00)
+            embed.add_field(name="Uploader", value=vc.source.uploader, inline=True)
+            embed.add_field(name="Duration", value="%d:%d" %(vc.source.duration//60, vc.source.duration%60), inline=True)
+            embed.add_field(name="Requested By", value=str(ctx.author), inline=True)
+            embed.set_thumbnail(url=vc.source.thumbnail)
+            await ctx.send(embed=embed)
+        except:
+             await ctx.send('**Nothing currently playing**')
         
     @commands.command(name='q', help='queue')
-    async def np(self, ctx):
-        if not self.player:
-            ctx.send('Queue is empty')
+    async def q(self, ctx):
+        vc = ctx.voice_client
+        if not(self.player) or not(vc.source or len(self.player.queue._queue)):
+            embed = discord.Embed(title="Queue for " + ctx.message.guild.name, description="__Now Playing:__\n\nNothing\n", color=0x00ff00)
+            await ctx.send(embed=embed)
         else:
-            songs_in_queue = []
+            songs_in_queue = ""
+            index = 0
             for song in self.player.queue._queue:
-                songs_in_queue.append(song.title)
-            await ctx.send(songs_in_queue)
+                index +=1
+                songs_in_queue += format_for_queue_embed(song, ctx.author, index)
+            
+            embed = discord.Embed(title=f"Queue for {ctx.message.guild.name}", 
+                                  description=f"__Now Playing:__\n{format_for_queue_embed(vc.source, ctx.author)}\n__Up Next:__\n{songs_in_queue}", color=0x00ff00)
+            embed.set_thumbnail(url=vc.source.thumbnail)
+            await ctx.send(embed = embed)
         #await ctx.send(vc.source.url)
         
     @commands.command(name='clear', help='clears queue')
     async def clear(self, ctx):
         self.player.queue._queue.clear()
-        await ctx.send('Cleared')
+        await ctx.send('**Cleared**')
         
     @commands.command(name='fs', help='skip')
     async def fs(self, ctx):
         vc = ctx.voice_client
         if not vc or not vc.is_connected():           
-            ctx.send('Not in a channel')
+            await ctx.send('**Not in a channel**')
         if vc.is_paused():
             pass
         elif not vc.is_playing():
             return
         vc.stop()
-        await ctx.send('Skipping...')
+        await ctx.send(':track_next: **Skipping...** :track_next:')
+        
+    @commands.command(name='loop', help='loops the queue')
+    async def loop(self, ctx):
+        vc = ctx.voice_client
+        if self.player.looping:
+            self.player.looping = False
+            await ctx.send(':no_entry_sign: **Queue loop OFF** :no_entry_sign:')
+        else:
+            self.player.looping = True
+            await ctx.send(':white_check_mark:  **Queue loop ON** :white_check_mark: ')
         
         
 bot = commands.Bot(command_prefix='!', intents=intents)
