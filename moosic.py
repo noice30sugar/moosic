@@ -81,7 +81,6 @@ def format_for_queue_embed(song, author, index=0):
     else:
         return '`%d.` [%s](%s) | `%d:%d Requested By: %s`\n\n' %(index, song.title, song.url, song.duration//60, song.duration%60, author)
         
-            
 class MusicBot(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -133,6 +132,7 @@ class MusicBot(commands.Cog):
     async def ty(self, ctx):
         embed = discord.Embed(title="", description="you're welcome!!", color=discord.Color.blue())
         await ctx.send(embed=embed)
+        await ctx.send(ctx.author)
         
     @commands.command(name='pause', help='pauses')
     async def pause(self, ctx):
@@ -179,7 +179,6 @@ class MusicBot(commands.Cog):
                                   description=f"__Now Playing:__\n{format_for_queue_embed(vc.source, ctx.author)}\n__Up Next:__\n{songs_in_queue}", color=0x00ff00)
             embed.set_thumbnail(url=vc.source.thumbnail)
             await ctx.send(embed = embed)
-        #await ctx.send(vc.source.url)
         
     @commands.command(name='clear', help='clears queue')
     async def clear(self, ctx):
@@ -208,7 +207,7 @@ class MusicBot(commands.Cog):
             self.player.looping = True
             await ctx.send(':white_check_mark:  **Queue loop ON** :white_check_mark: ')
         
-        
+         
 bot = commands.Bot(command_prefix='!', intents=intents)
 @bot.event    
 async def on_ready():
@@ -216,5 +215,3 @@ async def on_ready():
     
 bot.add_cog(MusicBot(bot))
 bot.run(token)
-            
-    
