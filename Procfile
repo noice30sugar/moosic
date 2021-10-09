@@ -1,1 +1,1 @@
-worker: python moosic.py
+bot: python moosic.py
