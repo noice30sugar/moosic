@@ -1,4 +1,4 @@
 discord==1.7.3
 discord.py==1.7.3
 python-dotenv==0.15.0
-youtube_dl
+youtube-dl
