@@ -22,7 +22,7 @@ The queue currently is auto-looping, meaning after a song is played, it will be 
 ```
 
 ## To-Do
- - [ ] Reformat !np output to include song duration and YouTube link as an embed
- - [ ] Reformat !q output to be an embed with a numbered list of all songs in queue (with song duration and YouTube link)
+ - [x] Reformat !np output to include song duration and YouTube link as an embed
+ - [x] Reformat !q output to be an embed with a numbered list of all songs in queue (with song duration and YouTube link)
  - [ ] Allow Spotify links
  - [ ] Allow removing of specific songs in the queue (by index)
