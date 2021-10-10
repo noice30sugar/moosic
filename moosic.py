@@ -69,7 +69,6 @@ class Queue:
             self.guild.voice_client.play(song_obj, after=lambda _: self.bot.loop.call_soon_threadsafe(self.play_next.set))
             if self.looping:
                 await self.queue.put(song_obj) 
-            await self.ctx.send('Playing '+ song_obj.title)
             #await ctx.send(song_obj.url)
             await self.play_next.wait()
             
@@ -81,11 +80,19 @@ def format_for_queue_embed(song, author, index=0):
         return '[%s](%s) | `%d:%d Requested By: %s`\n' %(song.title, song.url, song.duration//60, song.duration%60, author)
     else:
         return '`%d.` [%s](%s) | `%d:%d Requested By: %s`\n\n' %(index, song.title, song.url, song.duration//60, song.duration%60, author)
-        
+    
 class MusicBot(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.player = None
+    
+    @commands.command(name='cp', help='check if song is currently playing')
+    async def cp(self, ctx):
+        try:
+            current_song = ctx.voice_client.source.title
+            return True
+        except:
+            return False
         
     @commands.command(name='join')
     async def join(self, ctx):
@@ -95,12 +102,13 @@ class MusicBot(commands.Cog):
             channel = ctx.message.author.voice.channel
             try:
                 await channel.connect()
+                await ctx.send(f':thumbsup: **Joined** `{ctx.voice_client.channel}` :thumbsup:')
             except:
                 pass
             
     @commands.command(name='die', help='leaves channel')
     async def leave(self, ctx):
-        vc = ctx.message.guild.voice_client
+        vc = ctx.voice_client
         if not vc:
             await ctx.send("**im already dead**")
         elif vc.is_connected():
@@ -108,27 +116,34 @@ class MusicBot(commands.Cog):
             self.player = None
             
     @commands.command(name='p', help = 'plays stuff')        
-    async def play(self, ctx, search_param):
-        vc = ctx.message.guild.voice_client
+    async def play(self, ctx, *search_param):
+        vc = ctx.voice_client
+        search_param = " ".join(search_param[:])
         if not vc:
             await ctx.invoke(self.join)
-            vc = ctx.message.guild.voice_client
+            vc = ctx.voice_client
         if not self.player:
             music_player = Queue(ctx)
             self.player = music_player
-        await ctx.send(f":youtube: Searching :mag_right: {search_param}")
-        try:
+        await ctx.send(f":mag_right: **Searching** :mag_right: {search_param}")
+        currently_playing = await ctx.invoke(self.cp)
+        try:    
             song_obj = await Song.search(search_param, loop= self.bot.loop)
             await self.player.queue.put(song_obj)
-            embed = discord.Embed(title="Added to queue", description="", color=discord.Color.blue())
+        except:
+            await ctx.send(':x: **Unable to load from Youtube** :x:')
+            return
+        if currently_playing:
+            embed = discord.Embed(title="Added to queue", description=f"[{song_obj.title}]({song_obj.url})", color=discord.Color.blue())
             embed.add_field(name="Channel", value=song_obj.uploader, inline=True)
             embed.add_field(name="Duration", value="%d:%d" %(song_obj.duration//60, song_obj.duration%60), inline=True)
             embed.add_field(name="Requested By", value=str(ctx.author), inline=True)
-            embed.add_field(name="Position in queue", value=len(self.player.queue._queue)+1, inline=False)
+            embed.add_field(name="Position in queue", value=len(self.player.queue._queue), inline=False)
             embed.set_thumbnail(url=song_obj.thumbnail)
             await ctx.send(embed=embed)
-        except:
-            await ctx.send(':x: **Unable to load from Youtube** :x:')
+        else:
+            await ctx.send(f'**Playing** :notes: `{song_obj.title}` - Now!')
+            
 
     
     @commands.command(name='yw', help='youre welcome')
@@ -140,18 +155,18 @@ class MusicBot(commands.Cog):
     async def ty(self, ctx):
         embed = discord.Embed(title="", description="you're welcome!!", color=discord.Color.blue())
         await ctx.send(embed=embed)
-        await ctx.send(ctx.author)
+        await ctx.send(":luistretched:")
         
     @commands.command(name='pause', help='pauses')
     async def pause(self, ctx):
-        vc = ctx.message.guild.voice_client
+        vc = ctx.voice_client
         if vc.is_playing():
             vc.pause()
             await ctx.send(':pause_button: **Pausing...** :pause_button:')
 
     @commands.command(name='resume', help='resumes')
     async def resume(self, ctx):
-        vc = ctx.message.guild.voice_client
+        vc = ctx.voice_client
         if vc.is_paused():
             vc.resume()
             await ctx.send(':arrow_forward: **Resuming...** :arrow_forward: ')
@@ -159,7 +174,8 @@ class MusicBot(commands.Cog):
     @commands.command(name='np', help='now playing')
     async def np(self, ctx):
         vc = ctx.voice_client
-        try:
+        currently_playing = await ctx.invoke(self.cp)
+        if currently_playing:
             line = "**-------------------------------**"
             embed = discord.Embed(title="♪ Now Playing ♪", description=f"[{vc.source.title}]({vc.source.url})\n{line}\n", color=discord.Color.blue())
             embed.add_field(name="Channel", value=vc.source.uploader, inline=True)
@@ -167,13 +183,14 @@ class MusicBot(commands.Cog):
             embed.add_field(name="Requested By", value=str(ctx.author), inline=True)
             embed.set_thumbnail(url=vc.source.thumbnail)
             await ctx.send(embed=embed)
-        except:
+        else:
              await ctx.send('**Nothing currently playing**')
         
     @commands.command(name='q', help='queue')
     async def q(self, ctx):
         vc = ctx.voice_client
-        if not(self.player) or not(vc.source or len(self.player.queue._queue)):
+        currently_playing = await ctx.invoke(self.cp)
+        if not(self.player) or not(currently_playing):
             embed = discord.Embed(title="Queue for " + ctx.message.guild.name, description="__Now Playing:__\n\nNothing\n", color=discord.Color.blue())
             await ctx.send(embed=embed)
         else:
@@ -190,8 +207,11 @@ class MusicBot(commands.Cog):
         
     @commands.command(name='clear', help='clears queue')
     async def clear(self, ctx):
-        self.player.queue._queue.clear()
-        await ctx.send('**Cleared**')
+        try:
+            self.player.queue._queue.clear()
+            await ctx.send('**Cleared**')
+        except:
+            await ctx.send('**Nothing to clear**')
         
     @commands.command(name='fs', help='skip')
     async def fs(self, ctx):
@@ -214,6 +234,20 @@ class MusicBot(commands.Cog):
         else:
             self.player.looping = True
             await ctx.send(':white_check_mark:  **Queue loop ON** :white_check_mark: ')
+        
+    @commands.command(name='remove', help='removes an item from the queue, by index')
+    async def remove(self, ctx, index):
+        try:
+            index = int(index)
+        except:
+            await ctx.send(":x: **Use a numerical index** :x:")
+            return
+        if self.player and index <= len(self.player.queue._queue): 
+            song_to_remove = self.player.queue._queue[index-1]
+            self.player.queue._queue.remove(song_to_remove)
+            await ctx.send(f':white_check_mark: **Removed** `{song_to_remove.title}` :white_check_mark:')
+        else:
+            await ctx.send(":x: **Index out of range** :x:")
         
          
 bot = commands.Bot(command_prefix=prefix, intents=intents)
