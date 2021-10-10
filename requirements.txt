@@ -1,4 +1,8 @@
-discord==1.7.3
-discord.py==1.7.3
-python-dotenv==0.15.0
-youtube-dl==2021.6.6
+discord.py[voice]==1.7.3
+websockets
+pip
+youtube_dl==2021.6.6
+colorlog==5.0.1
+cffi --only-binary all; 
+chardet
+opuslib
