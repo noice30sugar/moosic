@@ -26,7 +26,7 @@ The queue currently is not auto-looping, meaning after a song is played, it will
 ## To-Do
  - [x] Reformat !np output to include song duration and YouTube link as an embed
  - [x] Reformat !q output to be an embed with a numbered list of all songs in queue (with song duration and YouTube link)
- - [ ] Add loop toggle
- - [ ] Allow Spotify links
+ - [x] Add loop toggle
  - [x] Allow removing of specific songs in the queue (by index)
+ - [ ] Allow Spotify links
  - [ ] Add guess the song game
