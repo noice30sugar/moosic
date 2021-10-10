@@ -5,6 +5,7 @@ import youtube_dl as ydl
 import asyncio
 
 token = os.environ["token"]
+prefix = os.environ["prefix"]
 intents = discord.Intents().all()
 client = discord.Client(intents=intents)
 
@@ -115,10 +116,17 @@ class MusicBot(commands.Cog):
         if not self.player:
             music_player = Queue(ctx)
             self.player = music_player
+        await ctx.send(f":youtube: Searching :mag_right: {search_param}")
         try:
             song_obj = await Song.search(search_param, loop= self.bot.loop)
             await self.player.queue.put(song_obj)
-            await ctx.send('Queued '+ song_obj.title)
+            embed = discord.Embed(title="Added to queue", description="", color=discord.Color.blue())
+            embed.add_field(name="Channel", value=song_obj.uploader, inline=True)
+            embed.add_field(name="Duration", value="%d:%d" %(song_obj.duration//60, song_obj.duration%60), inline=True)
+            embed.add_field(name="Requested By", value=str(ctx.author), inline=True)
+            embed.add_field(name="Position in queue", value=len(self.player.queue._queue)+1, inline=False)
+            embed.set_thumbnail(url=song_obj.thumbnail)
+            await ctx.send(embed=embed)
         except:
             await ctx.send(':x: **Unable to load from Youtube** :x:')
 
@@ -153,8 +161,8 @@ class MusicBot(commands.Cog):
         vc = ctx.voice_client
         try:
             line = "**-------------------------------**"
-            embed = discord.Embed(title="♪ Now Playing ♪", description=f"[{vc.source.title}]({vc.source.url})\n{line}\n", color=0x00ff00)
-            embed.add_field(name="Uploader", value=vc.source.uploader, inline=True)
+            embed = discord.Embed(title="♪ Now Playing ♪", description=f"[{vc.source.title}]({vc.source.url})\n{line}\n", color=discord.Color.blue())
+            embed.add_field(name="Channel", value=vc.source.uploader, inline=True)
             embed.add_field(name="Duration", value="%d:%d" %(vc.source.duration//60, vc.source.duration%60), inline=True)
             embed.add_field(name="Requested By", value=str(ctx.author), inline=True)
             embed.set_thumbnail(url=vc.source.thumbnail)
@@ -166,7 +174,7 @@ class MusicBot(commands.Cog):
     async def q(self, ctx):
         vc = ctx.voice_client
         if not(self.player) or not(vc.source or len(self.player.queue._queue)):
-            embed = discord.Embed(title="Queue for " + ctx.message.guild.name, description="__Now Playing:__\n\nNothing\n", color=0x00ff00)
+            embed = discord.Embed(title="Queue for " + ctx.message.guild.name, description="__Now Playing:__\n\nNothing\n", color=discord.Color.blue())
             await ctx.send(embed=embed)
         else:
             songs_in_queue = ""
@@ -176,7 +184,7 @@ class MusicBot(commands.Cog):
                 songs_in_queue += format_for_queue_embed(song, ctx.author, index)
             
             embed = discord.Embed(title=f"Queue for {ctx.message.guild.name}", 
-                                  description=f"__Now Playing:__\n{format_for_queue_embed(vc.source, ctx.author)}\n__Up Next:__\n{songs_in_queue}", color=0x00ff00)
+                                  description=f"__Now Playing:__\n{format_for_queue_embed(vc.source, ctx.author)}\n__Up Next:__\n{songs_in_queue}", color=discord.Color.blue())
             embed.set_thumbnail(url=vc.source.thumbnail)
             await ctx.send(embed = embed)
         
@@ -208,7 +216,7 @@ class MusicBot(commands.Cog):
             await ctx.send(':white_check_mark:  **Queue loop ON** :white_check_mark: ')
         
          
-bot = commands.Bot(command_prefix='!', intents=intents)
+bot = commands.Bot(command_prefix=prefix, intents=intents)
 @bot.event    
 async def on_ready():
     print('running')
