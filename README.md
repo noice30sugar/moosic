@@ -4,7 +4,7 @@
 This bot responds to user commands in a Discord text channel, joining the user's voice channel and playing songs. 
 The bot uses youtube-dl to search songs from YouTube, streaming the audio into the user's voice channel.
 A queue system is implemented, being able to queue multiple songs from multiple users and playing them one after another. 
-The queue currently is auto-looping, meaning after a song is played, it will be re-added to the end of the queue.
+The queue currently is not auto-looping, meaning after a song is played, it will not be re-added to the end of the queue unless toggled.
 
 ### The following commands can be used:
 ```
@@ -19,10 +19,14 @@ The queue currently is auto-looping, meaning after a song is played, it will be 
 !q, shows all the songs in the queue
 !clear, removes all the songs in the queue
 !fs, (short for force skip) skips the currently playing song
+!remove <index>, remove the <index>'th song in the queue
+!loop, toggles the auto-looping feature
 ```
 
 ## To-Do
  - [x] Reformat !np output to include song duration and YouTube link as an embed
  - [x] Reformat !q output to be an embed with a numbered list of all songs in queue (with song duration and YouTube link)
+ - [ ] Add loop toggle
  - [ ] Allow Spotify links
- - [ ] Allow removing of specific songs in the queue (by index)
+ - [x] Allow removing of specific songs in the queue (by index)
+ - [ ] Add guess the song game
