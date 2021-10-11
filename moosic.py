@@ -3,6 +3,8 @@ import os
 from discord.ext import commands
 import youtube_dl as ydl
 import asyncio
+import random
+import pickle
 
 token = os.environ["token"]
 prefix = os.environ["prefix"]
@@ -248,12 +250,190 @@ class MusicBot(commands.Cog):
             await ctx.send(f':white_check_mark: **Removed** `{song_to_remove.title}` :white_check_mark:')
         else:
             await ctx.send(":x: **Index out of range** :x:")
+class Bet():
+    def __init__(self, start_amt, player):
+        self.bet_starter = player
+        self.pot = start_amt
+        self.min_bet = start_amt
+        self.players = {player:start_amt}
         
-         
+    def add_to_pot(self, amount, player):
+        self.pot += amount
+        if player not in self.players:
+            self.players[player] = amount
+        else:
+            self.players[player] += amount            
+
+class Economy():
+    def __init__(self, bank={}):
+        self.bank = bank
+        self.bet = False
+        
+    def new_user(self, user):
+        if user not in self.bank:
+            self.bank[user] = 3000
+            return True
+        else:
+            return False
+                
+    def withdraw(self, amount, user):
+        self.bank[user] -= amount
+        
+    def deposit(self, amount, user):
+        self.bank[user] += amount
+        
+    def start_bet(self, amount, player):
+        self.bet = Bet(amount, player)
+        self.withdraw(amount, player)
+    
+    def join_bet(self, amount, player):
+        self.bet.add_to_pot(amount, player)
+        self.withdraw(amount, player)   
+        
+    def draw(self):
+        winner = random.choice(list(self.bet.players.keys()))
+        self.deposit(self.bet.pot, winner)
+        self.bet = False
+        return winner
+    
+    
+class Konata(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+        with open("data.pickle", "rb") as f:
+            self.econ = pickle.load(f)    
+    
+    @commands.command()
+    async def registered(self, ctx):
+        if self.econ.new_user(ctx.author.name):
+            return False
+        else:
+            return True
+        
+    @commands.command()
+    @commands.cooldown(1, 60*60*5, commands.BucketType.user)
+    async def daily(self, ctx):
+        if await ctx.invoke(self.registered):
+            coins = random.randint(150,350)
+            self.econ.deposit(coins, ctx.author.name)
+            await ctx.send(f':moneybag: Here you go: {coins} coins! You can claim another reward in 24 hours.')
+            pickle.dump(self.econ, open('data.pickle', 'wb'))
+        else:
+            await ctx.send('Register for a bank account using `balance` first!')
+        
+    @commands.command()
+    async def loot(self, ctx):
+        if random.randint(1,20) == 1:
+            coins = random.randint(20,60)
+            await ctx.send(f':person_running: You walk a little and find {coins} coins!')
+            if await ctx.invoke(self.registered):
+                self.econ.deposit(coins, ctx.author.name)
+                pickle.dump(self.econ, open('data.pickle', 'wb'))
+            else:
+                await ctx.send('Too bad you don\'t have a bank account!')
+        else:
+            await ctx.send('Nothing to loot here!')
+            
+    @commands.command()
+    async def balance(self, ctx):
+        if self.econ.new_user(ctx.author.name):
+            pickle.dump(self.econ, open('data.pickle', 'wb'))
+            await ctx.send(f'Created bank account for <@{ctx.author.name}>! 3000 coins have been added.')
+        else:
+            await ctx.send(f':information_source: You currently have {self.econ.bank[ctx.author.name]} coins in your account!')
+    
+    @commands.command()
+    async def rate(self, ctx, *args):
+        args = " ".join(args[:])
+        await ctx.send(f':thinking: I give **{args}** a {random.randint(0,10)}/10')
+        
+    @commands.command()
+    async def bet(self, ctx, cmd = None, coins = 10):
+        if not(isinstance(coins, int)):
+            await ctx.send('Enter a number of coins to bet.')
+            return
+        elif int(coins) <= 0:
+            await ctx.send('Number of coins must be nonzero to bet')
+            return
+        coins = int(coins)
+        if cmd == 'help':
+            embed = discord.Embed(title=":information_source: Gambling Time", 
+                                  description=":book: **Bet commands**\n" +
+                                              "`bet start` - Starts a bet in the current channel with a minimum value.\n" + 
+                                              "`bet join` - Joins a bet with a coin amount.\n" + 
+                                              "`bet draw` - Collects the total bet amount and chooses a winner!\n" +
+                                              "`bet info` - Shows you information on a bet running in the current channel;", color=discord.Color.blue())
+            await ctx.send(embed=embed)
+        elif cmd == 'start':
+            if self.econ.bet:
+                await ctx.send('Cannot start another bet while one is active.')
+            elif await ctx.invoke(self.registered):
+                    self.econ.start_bet(coins, ctx.author.name)
+                    await ctx.send(f':white_check_mark: Started a bet with {coins} coins!')
+                    pickle.dump(self.econ, open('data.pickle', 'wb'))
+            else:
+                await ctx.send('Register for a bank account to start bets')
+                
+        elif cmd == 'join':
+            if not(self.econ.bet):
+                await ctx.send('No current bet running')
+            elif await ctx.invoke(self.registered):
+                if coins < self.econ.bet.min_bet:
+                    await ctx.send(f'The minimum amount to bet is {self.econ.bet.min_bet}')
+                else:
+                    self.econ.join_bet(coins, ctx.author.name)
+                    await ctx.send(f'Added {coins} to the pot. Total pot: {self.econ.bet.pot}')
+                    pickle.dump(self.econ, open('data.pickle', 'wb'))
+            else:
+                await ctx.send('Register for a bank account to join bets')
+                
+        elif cmd == 'draw':
+            if not(self.econ.bet):
+                await ctx.send('No current bet running')
+            elif ctx.author.name == self.econ.bet.bet_starter:
+                pot = self.econ.bet.pot
+                await ctx.send(f'The bet has ended! And the lucky winner is... @{self.econ.draw()}! Congratulations, you won {pot} coins!')
+                pickle.dump(self.econ, open('data.pickle', 'wb'))
+            else:
+                await ctx.send(f'Only the bet starter @{self.econ.bet.bet_starter} can draw the bet')
+                
+        elif cmd == 'info':
+            if not(self.econ.bet):
+                await ctx.send('No current bet running')
+            else:
+                players_info = ""
+                index=1
+                for player in self.econ.bet.players:
+                    players_info += f"**#{index}** `{player}` - {self.econ.bet.players[player]} coins\n"
+                    index += 1
+                embed  = discord.Embed(title = f'{self.econ.bet.bet_starter}\'s bet', description = f"Total users participating: {len(self.econ.bet.players)}\n\n{players_info}",
+                                       color=discord.Color.blue())
+                embed.set_footer(text=f"Total coins: {self.econ.bet.pot}")
+                await ctx.send(embed = embed)
+                
+                
 bot = commands.Bot(command_prefix=prefix, intents=intents)
 @bot.event    
 async def on_ready():
     print('running')
+
+@bot.event
+async def on_command_error(ctx, error):
+    if isinstance(error, commands.CommandOnCooldown):
+        await ctx.send(f":sweat_smile: You have to wait {int(error.retry_after//(60*60))} hours, {int((error.retry_after%(60*60)//60))} minutes to claim another daily reward!")
     
 bot.add_cog(MusicBot(bot))
+bot.add_cog(Konata(bot))
 bot.run(token)
+
+        
+        
+    
+            
+
+        
+        
+        
+        
+        
+    
