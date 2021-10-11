@@ -7,7 +7,7 @@ import random
 import pickle
 
 token = os.environ["token"]
-prefix = ['-', 'konata ', 'maui']
+prefix = ['-','konata ', 'maui ']
 intents = discord.Intents().all()
 client = discord.Client(intents=intents)
 
