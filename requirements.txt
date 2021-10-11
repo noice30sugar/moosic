@@ -6,3 +6,4 @@ colorlog==5.0.1
 cffi --only-binary all; 
 chardet
 opuslib
+pickle
