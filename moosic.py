@@ -7,7 +7,7 @@ import random
 import pickle
 
 token = os.environ["token"]
-prefix = os.environ["prefix"]
+prefix = ['-', 'konata ', 'maui']
 intents = discord.Intents().all()
 client = discord.Client(intents=intents)
 
@@ -250,6 +250,7 @@ class MusicBot(commands.Cog):
             await ctx.send(f':white_check_mark: **Removed** `{song_to_remove.title}` :white_check_mark:')
         else:
             await ctx.send(":x: **Index out of range** :x:")
+            
 class Bet():
     def __init__(self, start_amt, player):
         self.bet_starter = player
@@ -301,7 +302,14 @@ class Konata(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         with open("data.pickle", "rb") as f:
-            self.econ = pickle.load(f)    
+            self.econ = pickle.load(f) 
+            
+            
+    @commands.command()
+    async def userid(self, ctx, user):
+        async for member in ctx.guild.fetch_members():
+            if user == member.name:
+                return f'<@!{member.id}>' 
     
     @commands.command()
     async def registered(self, ctx):
@@ -315,7 +323,7 @@ class Konata(commands.Cog):
     async def daily(self, ctx):
         if await ctx.invoke(self.registered):
             coins = random.randint(150,350)
-            self.econ.deposit(coins, ctx.author.name)
+            self.econ.deposit(coins,ctx.author.name)
             await ctx.send(f':moneybag: Here you go: {coins} coins! You can claim another reward in 24 hours.')
             pickle.dump(self.econ, open('data.pickle', 'wb'))
         else:
@@ -338,7 +346,7 @@ class Konata(commands.Cog):
     async def balance(self, ctx):
         if self.econ.new_user(ctx.author.name):
             pickle.dump(self.econ, open('data.pickle', 'wb'))
-            await ctx.send(f'Created bank account for <@{ctx.author.name}>! 3000 coins have been added.')
+            await ctx.send(f'Created bank account for {await ctx.invoke(self.userid, ctx.author.name)}! 3000 coins have been added.')
         else:
             await ctx.send(f':information_source: You currently have {self.econ.bank[ctx.author.name]} coins in your account!')
     
@@ -392,10 +400,10 @@ class Konata(commands.Cog):
                 await ctx.send('No current bet running')
             elif ctx.author.name == self.econ.bet.bet_starter:
                 pot = self.econ.bet.pot
-                await ctx.send(f'The bet has ended! And the lucky winner is... @{self.econ.draw()}! Congratulations, you won {pot} coins!')
+                await ctx.send(f'The bet has ended! And the lucky winner is... {await ctx.invoke(self.userid, self.econ.draw())}! Congratulations, you won {pot} coins!')
                 pickle.dump(self.econ, open('data.pickle', 'wb'))
             else:
-                await ctx.send(f'Only the bet starter @{self.econ.bet.bet_starter} can draw the bet')
+                await ctx.send(f'Only the bet starter {await ctx.invoke(self.userid, self.econ.bet.bet_starter)} can draw the bet')
                 
         elif cmd == 'info':
             if not(self.econ.bet):
