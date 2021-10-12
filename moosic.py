@@ -319,12 +319,12 @@ class Konata(commands.Cog):
             return True
         
     @commands.command()
-    @commands.cooldown(1, 60*60*5, commands.BucketType.user)
+    @commands.cooldown(1, 60*60*20, commands.BucketType.user)
     async def daily(self, ctx):
         if await ctx.invoke(self.registered):
             coins = random.randint(150,350)
             self.econ.deposit(coins,ctx.author.name)
-            await ctx.send(f':moneybag: Here you go: {coins} coins! You can claim another reward in 24 hours.')
+            await ctx.send(f':moneybag: Here you go: {coins} coins! You can claim another reward in 20 hours.')
             pickle.dump(self.econ, open('data.pickle', 'wb'))
         else:
             await ctx.send('Register for a bank account using `balance` first!')
