@@ -33,7 +33,7 @@ ffmpeg_options = {
 yt = ydl.YoutubeDL(ydl_options)
 
 class Song(discord.PCMVolumeTransformer):
-    def __init__(self, source, *, data, volume=0.5):
+    def __init__(self, source, *, data, author, volume=0.5):
         super().__init__(source, volume)
         self.data = data
         self.title = data.get('title')
@@ -41,14 +41,15 @@ class Song(discord.PCMVolumeTransformer):
         self.duration = data.get('duration')
         self.thumbnail = data.get('thumbnail')
         self.uploader = data.get('uploader')
+        self.requester = author
 
     @classmethod
-    async def search(cls, search, *, loop=None):
+    async def search(cls, search, author, *, loop=None):
         loop = loop or asyncio.get_event_loop()
         playlist = await loop.run_in_executor(None, lambda: yt.extract_info(search, download=False))
         if 'entries' in playlist:
             playlist = playlist['entries'][0]
-        return cls(discord.FFmpegPCMAudio(playlist['url']), data=playlist)
+        return cls(discord.FFmpegPCMAudio(playlist['url']), data=playlist, author=author)
     
 class Queue:
     def __init__(self, ctx):
@@ -67,7 +68,7 @@ class Queue:
         while not self.bot.is_closed():
             self.play_next.clear()
             song_obj = await self.queue.get()
-            song_obj = await Song.search(song_obj.title)
+            song_obj = await Song.search(song_obj.title, song_obj.requester)
             self.guild.voice_client.play(song_obj, after=lambda _: self.bot.loop.call_soon_threadsafe(self.play_next.set))
             if self.looping:
                 await self.queue.put(song_obj) 
@@ -77,11 +78,19 @@ class Queue:
             # Make sure the FFmpeg process is cleaned up.
             song_obj.cleanup()
             
-def format_for_queue_embed(song, author, index=0):
+def format_for_queue_embed(song, index=0):
     if not(index):
-        return '[%s](%s) | `%d:%d Requested By: %s`\n' %(song.title, song.url, song.duration//60, song.duration%60, author)
+        return '[%s](%s) | `Duration: %d:%s Requested By: %s`\n' %(song.title, song.url, song.duration//60, 
+                                                                   seconds_format(song.duration%60), song.requester)
     else:
-        return '`%d.` [%s](%s) | `%d:%d Requested By: %s`\n\n' %(index, song.title, song.url, song.duration//60, song.duration%60, author)
+        return '`%d.` [%s](%s) | `Duration: %d:%s Requested By: %s`\n\n' %(index, song.title, song.url, song.duration//60, 
+                                                                           seconds_format(song.duration%60), song.requester)
+    
+def seconds_format(num):
+    if num < 10:
+        return "0" + str(num)
+    else:
+        return str(num)
     
 class MusicBot(commands.Cog):
     def __init__(self, bot):
@@ -130,7 +139,7 @@ class MusicBot(commands.Cog):
         await ctx.send(f":mag_right: **Searching** :mag_right: {search_param}")
         currently_playing = await ctx.invoke(self.cp)
         try:    
-            song_obj = await Song.search(search_param, loop= self.bot.loop)
+            song_obj = await Song.search(search_param, author=ctx.author, loop= self.bot.loop)
             await self.player.queue.put(song_obj)
         except:
             await ctx.send(':x: **Unable to load from Youtube** :x:')
@@ -138,8 +147,8 @@ class MusicBot(commands.Cog):
         if currently_playing:
             embed = discord.Embed(title="Added to queue", description=f"[{song_obj.title}]({song_obj.url})", color=discord.Color.blue())
             embed.add_field(name="Channel", value=song_obj.uploader, inline=True)
-            embed.add_field(name="Duration", value="%d:%d" %(song_obj.duration//60, song_obj.duration%60), inline=True)
-            embed.add_field(name="Requested By", value=str(ctx.author), inline=True)
+            embed.add_field(name="Duration", value="%d:%s" %(song_obj.duration//60, seconds_format(song_obj.duration%60)), inline=True)
+            embed.add_field(name="Requested By", value=str(song_obj.requester), inline=True)
             embed.add_field(name="Position in queue", value=len(self.player.queue._queue), inline=False)
             embed.set_thumbnail(url=song_obj.thumbnail)
             await ctx.send(embed=embed)
@@ -151,13 +160,12 @@ class MusicBot(commands.Cog):
     @commands.command(name='yw', help='youre welcome')
     async def yw(self, ctx):
         await ctx.invoke(self.join)
-        await ctx.invoke(self.play, 'youre welcome')
+        await ctx.invoke(self.play, 'youre welcome', ctx.author)
 
     @commands.command(name='ty', help='test')
     async def ty(self, ctx):
         embed = discord.Embed(title="", description="you're welcome!!", color=discord.Color.blue())
         await ctx.send(embed=embed)
-        await ctx.send(":luistretched:")
         
     @commands.command(name='pause', help='pauses')
     async def pause(self, ctx):
@@ -181,8 +189,8 @@ class MusicBot(commands.Cog):
             line = "**-------------------------------**"
             embed = discord.Embed(title="♪ Now Playing ♪", description=f"[{vc.source.title}]({vc.source.url})\n{line}\n", color=discord.Color.blue())
             embed.add_field(name="Channel", value=vc.source.uploader, inline=True)
-            embed.add_field(name="Duration", value="%d:%d" %(vc.source.duration//60, vc.source.duration%60), inline=True)
-            embed.add_field(name="Requested By", value=str(ctx.author), inline=True)
+            embed.add_field(name="Duration", value="%d:%s" %(vc.source.duration//60, seconds_format(vc.source.duration%60)), inline=True)
+            embed.add_field(name="Requested By", value=vc.source.requester, inline=True)
             embed.set_thumbnail(url=vc.source.thumbnail)
             await ctx.send(embed=embed)
         else:
@@ -200,10 +208,10 @@ class MusicBot(commands.Cog):
             index = 0
             for song in self.player.queue._queue:
                 index +=1
-                songs_in_queue += format_for_queue_embed(song, ctx.author, index)
+                songs_in_queue += format_for_queue_embed(song, index)
             
             embed = discord.Embed(title=f"Queue for {ctx.message.guild.name}", 
-                                  description=f"__Now Playing:__\n{format_for_queue_embed(vc.source, ctx.author)}\n__Up Next:__\n{songs_in_queue}", color=discord.Color.blue())
+                                  description=f"__Now Playing:__\n{format_for_queue_embed(vc.source)}\n__Up Next:__\n{songs_in_queue}", color=discord.Color.blue())
             embed.set_thumbnail(url=vc.source.thumbnail)
             await ctx.send(embed = embed)
         
